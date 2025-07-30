@@ -1,0 +1,242 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 18
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1f74c456-309a-437a-999f-2da4b14fab21",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "artificial intelligence OR machine learning OR AI"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "sortBy",
+              "value": "publishedAt"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "from",
+              "value": "={{ $now.minus({days: 1}).toISODate() }}"
+            },
+            {
+              "name": "apiKey",
+              "value": "8ffa129a6ff04df997549584c8a7f128"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "839d6ae7-44ea-4470-83c2-e973aa8c3626",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter and clean articles\nconst articles = $input.all()[0].json.articles || [];\n\nconst processedArticles = articles\n  .filter(article => \n    article.title && \n    article.description && \n    article.url &&\n    !article.title.toLowerCase().includes('[removed]')\n  )\n  .slice(0, 5) // Top 5 articles\n  .map(article => ({\n    title: article.title,\n    description: article.description,\n    url: article.url,\n    source: article.source.name,\n    publishedAt: article.publishedAt,\n    content: article.content || article.description\n  }));\n\nreturn processedArticles.map(article => ({ json: article }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        16
+      ],
+      "id": "96365aa4-299b-4b00-90b0-32ecc119fb88",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        608,
+        176
+      ],
+      "id": "43534125-2e9c-4ea0-8d3c-98de3f5c2584",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "PHxIxsQTTf9HjMx4",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Title: {{ $json.title }}\nContent: {{ $json.description }}",
+        "options": {
+          "systemMessage": "You are an AI newsletter writer. Summarize the following news article in 2-3 sentences with a friendly, engaging tone. Focus on the key insights and why it matters to AI enthusiasts."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        16
+      ],
+      "id": "d1ffda34-f0c0-46ee-931c-f4fa289d59d1",
+      "name": "Daily AI Newsletter"
+    },
+    {
+      "parameters": {
+        "jsCode": "const articles = $input.all();\nconst today = new Date().toLocaleDateString('en-US', { \n  weekday: 'long', \n  year: 'numeric', \n  month: 'long', \n  day: 'numeric' \n});\n\nlet newsletter = `\n# 🤖 Daily AI Newsletter - ${today}\n\nWelcome to your daily dose of AI news! Here are today's top stories:\n\n`;\n\narticles.forEach((item, index) => {\n  const article = item.json;\n  newsletter += `\n## ${index + 1}. ${article.title}\n\n${article.summary || article.description}\n\n**Source**: ${article.source} | [Read Full Article](${article.url})\n\n---\n\n`;\n});\n\nnewsletter += `\n## 🔥 That's a wrap!\n\nStay curious and keep learning! \n\n*This newsletter was automatically generated and curated by AI.*\n\n---\n*Want to unsubscribe? Reply with \"UNSUBSCRIBE\"*\n`;\n\nreturn [{ json: { newsletter, subject: `🤖 Daily AI Newsletter - ${today}` } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        32
+      ],
+      "id": "87016a64-f7c7-4a4c-a52e-deedbd244e06",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "sendTo": "aditimandal2k4@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.newsletter.replace(/\\n/g, '<br>').replace(/# /g, '<h1>').replace(/## /g, '<h2>') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        32
+      ],
+      "id": "5f8f8eec-8a6f-40ce-b658-a83511ae6173",
+      "name": "Send a message",
+      "webhookId": "1e988bf7-f814-42e9-bba0-e23b8ab378ca",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "tsQiUisuFLGKbgt0",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Daily AI Newsletter",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Daily AI Newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily AI Newsletter": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "484ba7ef-373d-4409-b3f1-2175eff60915",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "aad00400c800017e7bd9e7fb6606e8e5fb43e945d04084f18086a0dfed053da9"
+  },
+  "id": "m4oaGXQRb4axM6lb",
+  "tags": []
+}
